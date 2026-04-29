@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="V8 Tracker">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>V8 Tracker</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: #0a0e1a;
+    color: #e8e8f0;
+    font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  input[type=number]::-webkit-inner-spin-button,
+  input[type=number]::-webkit-outer-spin-button {
+    -webkit-appearance: none; margin: 0;
+  }
+  input[type=number] { -moz-appearance: textfield; }
+  button { font-family: inherit; }
+  @keyframes slideUp {
+    from { transform: translate(-50%, 100%); opacity: 0; }
+    to { transform: translate(-50%, 0); opacity: 1; }
+  }
+  @keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 0 rgba(255, 167, 38, 0); }
+    50% { box-shadow: 0 0 12px rgba(255, 167, 38, 0.4); }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+// ============= ICONE INLINE (lucide style) =============
+
+const Icon = ({ d, size = 18, color = 'currentColor', strokeWidth = 2, fill = 'none' }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24"
+       fill={fill} stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+    {d}
+  </svg>
+);
+
+const Dumbbell = (p) => <Icon d={<><path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/></>} {...p}/>;
+const Scale = (p) => <Icon d={<><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></>} {...p}/>;
+const BarChart3 = (p) => <Icon d={<><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></>} {...p}/>;
+const Moon = (p) => <Icon d={<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>} {...p}/>;
+const BookOpen = (p) => <Icon d={<><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></>} {...p}/>;
+const Save = (p) => <Icon d={<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></>} {...p}/>;
+const ChevronLeft = (p) => <Icon d={<path d="m15 18-6-6 6-6"/>} {...p}/>;
+const ChevronRight = (p) => <Icon d={<path d="m9 18 6-6-6-6"/>} {...p}/>;
+const Camera = (p) => <Icon d={<><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></>} {...p}/>;
+const Check = (p) => <Icon d={<path d="M20 6 9 17l-5-5"/>} {...p}/>;
+const TrendingUp = (p) => <Icon d={<><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></>} {...p}/>;
+const TrendingDown = (p) => <Icon d={<><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></>} {...p}/>;
+const Minus = (p) => <Icon d={<path d="M5 12h14"/>} {...p}/>;
+const Lightbulb = (p) => <Icon d={<><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></>} {...p}/>;
+const Timer = (p) => <Icon d={<><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></>} {...p}/>;
+const Play = (p) => <Icon d={<polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/>} {...p}/>;
+const Pause = (p) => <Icon d={<><rect width="4" height="16" x="6" y="4" fill="currentColor"/><rect width="4" height="16" x="14" y="4" fill="currentColor"/></>} {...p}/>;
+const RotateCcw = (p) => <Icon d={<><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></>} {...p}/>;
+const Volume2 = (p) => <Icon d={<><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></>} {...p}/>;
+const VolumeX = (p) => <Icon d={<><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></>} {...p}/>;
+const Download = (p) => <Icon d={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></>} {...p}/>;
+const Upload = (p) => <Icon d={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></>} {...p}/>;
+const Settings = (p) => <Icon d={<><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></>} {...p}/>;
+
+// ============= DATA =============
+
+const EXERCISES = {
+  push: [
+    { id: 'lun_1', name: 'Bench DB inclinato 30°', sets: 4, reps: '8-10', rir: '2-3', rest: '3:00', isCompound: true, tags: ['PETTO', 'D.ANT'], badges: ['C', 'ECC'] },
+    { id: 'lun_2', name: 'Military press DB seduto', sets: 3, reps: '8-10', rir: '2', rest: '2:30', isCompound: true, tags: ['D.ANT', 'D.MED'], badges: ['C'] },
+    { id: 'lun_3', name: 'Croci cavi (ROT-A bassi-alto / ROT-B alti-basso)', sets: 3, reps: '10-12', rir: '1-2', rest: '1:30', isCompound: false, tags: ['PETTO'], badges: ['SMH'] },
+    { id: 'lun_4', name: 'Lateral raise cavo single-arm cross-body', sets: 4, reps: '10-12', rir: '1-2', rest: '1:15', isCompound: false, tags: ['D.MED'], badges: ['SMH'] },
+    { id: 'lun_5', name: 'Tricipiti corda overhead', sets: 3, reps: '9-11', rir: '1-2', rest: '1:15', isCompound: false, tags: ['TRI'], badges: ['SMH', 'LLP'] },
+    { id: 'lun_6', name: 'Pushdown corda / Francese DB (rotazione)', sets: 2, reps: '10-12', rir: '0-1', rest: '1:00', isCompound: false, tags: ['TRI'], badges: ['MYO'] },
+  ],
+  pull: [
+    { id: 'mar_1', name: 'Pull-up zavorrato o lat pulldown', sets: 4, reps: '7-9', rir: '2', rest: '3:00', isCompound: true, tags: ['DORSO', 'BI'], badges: ['C', 'SMH'] },
+    { id: 'mar_2', name: 'Rematore bilanciere busto 45°', sets: 4, reps: '8-10', rir: '2', rest: '2:30', isCompound: true, tags: ['DORSO', 'D.POST'], badges: ['C', 'ECC'] },
+    { id: 'mar_3', name: 'Pullover cavi alti braccia tese', sets: 3, reps: '10-12', rir: '1', rest: '1:30', isCompound: false, tags: ['DORSO'], badges: ['SMH'] },
+    { id: 'mar_4', name: 'Reverse fly cavi', sets: 3, reps: '10-12', rir: '0-1', rest: '1:15', isCompound: false, tags: ['D.POST'], badges: ['SMH'] },
+    { id: 'mar_5', name: 'Curl bicipiti (ROT-A inclinato 60° / ROT-B Bayesian)', sets: 3, reps: '9-11', rir: '1', rest: '1:30', isCompound: false, tags: ['BI'], badges: ['SMH', 'LLP'] },
+    { id: 'mar_6', name: 'Curl panca Scott con EZ', sets: 2, reps: '9-11', rir: '0-1', rest: '1:15', isCompound: false, tags: ['BI'], badges: ['LLP'] },
+  ],
+  legs: [
+    { id: 'gio_1', name: 'Squat bilanciere ROM pieno', sets: 4, reps: '7-9', rir: '2-3', rest: '3:30', isCompound: true, tags: ['QUAD', 'GLUTE'], badges: ['C', 'SMH'] },
+    { id: 'gio_2', name: 'Stacco rumeno bilanciere', sets: 4, reps: '8-10', rir: '2', rest: '3:00', isCompound: true, tags: ['HAM', 'GLUTE'], badges: ['C', 'SMH', 'ECC'] },
+    { id: 'gio_3', name: 'Leg extension', sets: 3, reps: '10-12', rir: '1', rest: '1:30', isCompound: false, tags: ['QUAD'], badges: ['SMH', 'LLP'] },
+    { id: 'gio_4', name: 'Leg curl seduto', sets: 3, reps: '10-12', rir: '1', rest: '2:00', isCompound: false, tags: ['HAM'], badges: ['SMH', 'ECC'] },
+    { id: 'gio_5', name: 'Hip thrust bilanciere', sets: 3, reps: '8-10', rir: '2', rest: '2:30', isCompound: true, tags: ['GLUTE'], badges: ['C'] },
+    { id: 'gio_6', name: 'Standing calf raise', sets: 3, reps: '8-10', rir: '0-1', rest: '1:15', isCompound: false, tags: ['POLP'], badges: ['SMH'] },
+  ],
+  upper: [
+    { id: 'ven_1', name: 'Panca piana bilanciere', sets: 4, reps: '7-9', rir: '2', rest: '3:00', isCompound: true, tags: ['PETTO', 'TRI'], badges: ['C', 'ECC'] },
+    { id: 'ven_2', name: 'Lat pulldown presa neutra larga', sets: 3, reps: '9-11', rir: '1-2', rest: '2:00', isCompound: true, tags: ['DORSO', 'BI'], badges: ['C'] },
+    { id: 'ven_3', name: 'Spinta complementare (ROT-A Dip / ROT-B DB declinata)', sets: 3, reps: '8-10', rir: '1-2', rest: '2:00', isCompound: true, tags: ['PETTO', 'TRI'], badges: ['C', 'SMH'] },
+    { id: 'ven_4', name: 'Face pull cavi alti corda', sets: 3, reps: '12-15', rir: '0-1', rest: '1:00', isCompound: false, tags: ['D.POST'], badges: [] },
+    { id: 'ven_5', name: 'Curl cavo + Hammer DB superset', sets: 3, reps: '10+8', rir: '0-1', rest: '1:30', isCompound: false, tags: ['BI', 'AVB'], badges: [] },
+    { id: 'ven_6', name: 'Tricipiti francese DB panca', sets: 2, reps: '9-11', rir: '0-1', rest: '1:15', isCompound: false, tags: ['TRI'], badges: ['SMH'] },
+  ],
+  full: [
+    { id: 'sab_1', name: 'Leg extension pump (refresh)', sets: 3, reps: '10-12', rir: '1-2', rest: '2:00', isCompound: false, tags: ['QUAD'], badges: ['SMH'] },
+    { id: 'sab_2', name: 'Rear delt fly DB', sets: 3, reps: '10-12', rir: '0-1', rest: '1:00', isCompound: false, tags: ['D.POST'], badges: ['SMH'] },
+    { id: 'sab_3', name: 'Lateral raise leaning-away cavo', sets: 3, reps: '10-12', rir: '0-1', rest: '1:00', isCompound: false, tags: ['D.MED'], badges: ['SMH'] },
+    { id: 'sab_4', name: 'Preacher curl EZ', sets: 2, reps: '9-11', rir: '0-1', rest: '1:15', isCompound: false, tags: ['BI'], badges: ['LLP'] },
+    { id: 'sab_5', name: 'Ab wheel rollout o leg raise', sets: 2, reps: '10-12', rir: '1', rest: '1:15', isCompound: false, tags: ['CORE'], badges: [] },
+    { id: 'sab_6', name: 'Seated calf raise (soleo)', sets: 2, reps: '10-12', rir: '0-1', rest: '1:15', isCompound: false, tags: ['POLP'], badges: [] },
+  ],
+};
+
+const DAYS = [
+  { id: 'push', label: 'PUSH', dayName: 'LUN', color: '#ef5350', subtitle: 'Petto / Spalle / Tri', dur: '60-65 min' },
+  { id: 'pull', label: 'PULL', dayName: 'MAR', color: '#42a5f5', subtitle: 'Dorsali / Bi / Posteriori', dur: '60-65 min' },
+  { id: 'legs', label: 'LEGS', dayName: 'GIO', color: '#ffa726', subtitle: 'Quad / Ham / Glute / Polp', dur: '75 min' },
+  { id: 'upper', label: 'UPPER', dayName: 'VEN', color: '#66bb6a', subtitle: 'Volume complementare', dur: '60-65 min' },
+  { id: 'full', label: 'FULL/W', dayName: 'SAB', color: '#ab47bc', subtitle: 'Punti deboli', dur: '50 min' },
+];
+
+const BLOCKS = [
+  { id: 'A', label: 'A · ACCUMULO', weeks: [1, 2, 3], color: '#ffa726', reps: '8-10', rir: '2-3' },
+  { id: 'B', label: 'B · INTENSIFICAZIONE', weeks: [4, 5, 6], color: '#ef5350', reps: '5-8', rir: '1-2' },
+  { id: 'C', label: 'C · PEAK', weeks: [7, 8], color: '#ab47bc', reps: '4-6 + AMRAP', rir: '0-1' },
+];
+
+const TAG_COLORS = {
+  'PETTO': { bg: 'rgba(244, 143, 177, 0.15)', border: 'rgba(244, 143, 177, 0.5)', text: '#f48fb1' },
+  'D.ANT': { bg: 'rgba(255, 167, 38, 0.15)', border: 'rgba(255, 167, 38, 0.5)', text: '#ffa726' },
+  'D.MED': { bg: 'rgba(255, 183, 77, 0.15)', border: 'rgba(255, 183, 77, 0.5)', text: '#ffb74d' },
+  'D.POST': { bg: 'rgba(149, 117, 205, 0.15)', border: 'rgba(149, 117, 205, 0.5)', text: '#9575cd' },
+  'TRI': { bg: 'rgba(240, 98, 146, 0.15)', border: 'rgba(240, 98, 146, 0.5)', text: '#f06292' },
+  'BI': { bg: 'rgba(77, 208, 225, 0.15)', border: 'rgba(77, 208, 225, 0.5)', text: '#4dd0e1' },
+  'DORSO': { bg: 'rgba(100, 181, 246, 0.15)', border: 'rgba(100, 181, 246, 0.5)', text: '#64b5f6' },
+  'AVB': { bg: 'rgba(77, 182, 172, 0.15)', border: 'rgba(77, 182, 172, 0.5)', text: '#4db6ac' },
+  'QUAD': { bg: 'rgba(255, 213, 79, 0.15)', border: 'rgba(255, 213, 79, 0.5)', text: '#ffd54f' },
+  'HAM': { bg: 'rgba(186, 104, 200, 0.15)', border: 'rgba(186, 104, 200, 0.5)', text: '#ba68c8' },
+  'GLUTE': { bg: 'rgba(236, 64, 122, 0.15)', border: 'rgba(236, 64, 122, 0.5)', text: '#ec407a' },
+  'POLP': { bg: 'rgba(161, 136, 127, 0.15)', border: 'rgba(161, 136, 127, 0.5)', text: '#a1887f' },
+  'CORE': { bg: 'rgba(120, 144, 156, 0.15)', border: 'rgba(120, 144, 156, 0.5)', text: '#78909c' },
+};
+
+const BADGE_COLORS = {
+  'C': { bg: 'rgba(239, 83, 80, 0.18)', border: 'rgba(239, 83, 80, 0.5)', text: '#ef5350' },
+  'SMH': { bg: 'rgba(66, 165, 245, 0.18)', border: 'rgba(66, 165, 245, 0.5)', text: '#42a5f5' },
+  'LLP': { bg: 'rgba(171, 71, 188, 0.18)', border: 'rgba(171, 71, 188, 0.5)', text: '#ab47bc' },
+  'MYO': { bg: 'rgba(102, 187, 106, 0.18)', border: 'rgba(102, 187, 106, 0.5)', text: '#66bb6a' },
+  'ECC': { bg: 'rgba(38, 198, 218, 0.18)', border: 'rgba(38, 198, 218, 0.5)', text: '#26c6da' },
+  'AMRAP': { bg: 'rgba(255, 167, 38, 0.18)', border: 'rgba(255, 167, 38, 0.5)', text: '#ffa726' },
+};
+
+const COMPOUNDS = [
+  { name: 'Bench DB inclinato 30°', day: 'push', idx: 0 },
+  { name: 'Military press DB seduto', day: 'push', idx: 1 },
+  { name: 'Pull-up zavorrato', day: 'pull', idx: 0 },
+  { name: 'Rematore bilanciere', day: 'pull', idx: 1 },
+  { name: 'Squat bilanciere', day: 'legs', idx: 0 },
+  { name: 'Stacco rumeno', day: 'legs', idx: 1 },
+  { name: 'Hip thrust bilanciere', day: 'legs', idx: 4 },
+  { name: 'Panca piana bilanciere', day: 'upper', idx: 0 },
+];
+
+// ============= LOGICA BLOCCHI =============
+
+const applyBlockLogic = (exercise, week) => {
+  let { sets, reps, rir, rest, isCompound } = exercise;
+  let blockName = 'ACCUMULO';
+  if (week >= 4 && week <= 6) {
+    blockName = 'INTENSIFICAZIONE';
+    if (isCompound) {
+      sets = Math.max(1, sets - 1); reps = '5-8'; rir = '1'; rest = '3:00-3:30';
+    } else { reps = '8-10'; rir = '1'; }
+  } else if (week >= 7) {
+    blockName = 'PEAK';
+    if (isCompound) {
+      sets = Math.max(1, sets - 1);
+      reps = week === 8 ? '3-5 + AMRAP' : '4-6';
+      rir = '0-1'; rest = '3:30-4:00';
+    } else { sets = Math.max(1, sets - 1); reps = '6-8'; rir = '0'; }
+  }
+  return { sets, reps, rir, rest, blockName };
+};
+
+const parseRepRange = (repString) => {
+  if (!repString) return { min: 0, max: 0 };
+  const cleaned = repString.replace('AMRAP', '').replace('+', '').trim();
+  if (cleaned.includes('-')) {
+    const [min, max] = cleaned.split('-').map(r => parseInt(r));
+    return { min: min || 0, max: isNaN(max) ? min : max };
+  }
+  return { min: parseInt(cleaned) || 0, max: parseInt(cleaned) || 0 };
+};
+
+const isLowerBody = (tags) => tags.some(t => ['QUAD', 'HAM', 'GLUTE', 'POLP'].includes(t));
+
+const getSuggestedWeight = (exercise, currentWeek, dayId, allWorkouts) => {
+  if (currentWeek <= 1) return null;
+  const prevWeekData = allWorkouts[currentWeek - 1]?.[dayId]?.esercizi;
+  if (!prevWeekData) return null;
+  const exIdx = EXERCISES[dayId].findIndex(e => e.id === exercise.id);
+  if (exIdx === -1) return null;
+  const prevLog = prevWeekData[exIdx];
+  if (!prevLog || !prevLog.kg) return null;
+  const prevWeight = parseFloat(prevLog.kg);
+  if (isNaN(prevWeight)) return null;
+  const prevLogic = applyBlockLogic(exercise, currentWeek - 1);
+  const prevTargets = parseRepRange(prevLogic.reps);
+  const repsArr = (prevLog.reps || []).map(r => parseInt(r)).filter(r => !isNaN(r) && r > 0);
+  const hitMaxReps = repsArr.length >= prevLogic.sets && repsArr.every(r => r >= prevTargets.max);
+  const increment = isLowerBody(exercise.tags) ? 5 : 2.5;
+  if (currentWeek === 4 && exercise.isCompound) {
+    return (Math.round((prevWeight * 1.05) / 2.5) * 2.5).toFixed(1);
+  }
+  if (hitMaxReps) return (prevWeight + increment).toFixed(1);
+  return prevWeight.toFixed(1);
+};
+
+const parseRestSeconds = (restStr) => {
+  if (!restStr) return 90;
+  const firstPart = restStr.split('-')[0].trim();
+  const [m, s] = firstPart.split(':').map(n => parseInt(n));
+  return (m || 0) * 60 + (s || 0);
+};
+
+// ============= STORAGE (localStorage) =============
+
+const KEY_PREFIX = 'v8tracker_';
+const storage = {
+  get(key) {
+    try {
+      const v = localStorage.getItem(KEY_PREFIX + key);
+      return v ? JSON.parse(v) : null;
+    } catch (e) { return null; }
+  },
+  set(key, value) {
+    try { localStorage.setItem(KEY_PREFIX + key, JSON.stringify(value)); return true; }
+    catch (e) { return false; }
+  },
+  exportAll() {
+    const data = {};
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(KEY_PREFIX)) {
+        data[k.replace(KEY_PREFIX, '')] = JSON.parse(localStorage.getItem(k));
+      }
+    }
+    return data;
+  },
+  importAll(data) {
+    Object.entries(data).forEach(([k, v]) => {
+      localStorage.setItem(KEY_PREFIX + k, JSON.stringify(v));
+    });
+  },
+  clearAll() {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(KEY_PREFIX)) keys.push(k);
+    }
+    keys.forEach(k => localStorage.removeItem(k));
+  },
+};
+
+// ============= STYLES =============
+
+const bgGradient = 'linear-gradient(180deg, #0a0e1a 0%, #1a1228 50%, #0a0e1a 100%)';
+const glassCard = {
+  background: 'linear-gradient(135deg, rgba(40, 40, 60, 0.6) 0%, rgba(30, 30, 50, 0.5) 100%)',
+  backdropFilter: 'blur(20px)',
+  WebkitBackdropFilter: 'blur(20px)',
+  border: '1px solid rgba(255, 255, 255, 0.08)',
+  borderRadius: '20px',
+  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+};
+const inputDark = {
+  background: 'rgba(20, 20, 35, 0.6)',
+  border: '1px solid rgba(255, 255, 255, 0.1)',
+  color: '#e8e8f0',
+  borderRadius: '8px',
+  fontSize: '14px',
+  textAlign: 'center',
+  outline: 'none',
+};
+
+// ============= UI =============
+
+function Tag({ name }) {
+  const c = TAG_COLORS[name] || { bg: 'rgba(255,255,255,0.1)', border: 'rgba(255,255,255,0.2)', text: '#999' };
+  return (
+    <span style={{
+      display: 'inline-block', padding: '3px 9px', borderRadius: '12px',
+      fontSize: '10px', fontWeight: '600', color: c.text,
+      backgroundColor: c.bg, border: `1px solid ${c.border}`,
+      marginRight: '4px', marginBottom: '4px',
+      textTransform: 'uppercase', letterSpacing: '0.4px',
+    }}>{name}</span>
+  );
+}
+
+function Badge({ name }) {
+  const c = BADGE_COLORS[name] || { bg: 'rgba(255,255,255,0.1)', border: 'rgba(255,255,255,0.2)', text: '#999' };
+  return (
+    <span style={{
+      display: 'inline-block', padding: '3px 9px', borderRadius: '12px',
+      fontSize: '10px', fontWeight: '600', color: c.text,
+      backgroundColor: c.bg, border: `1px solid ${c.border}`,
+      marginRight: '4px', marginBottom: '4px',
+      letterSpacing: '0.4px',
+    }}>{name}</span>
+  );
+}
+
+function MetaPill({ label, value, IconComp, color }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: '4px',
+      padding: '4px 10px', borderRadius: '14px',
+      fontSize: '11px', color: color || '#b8b8c8',
+      backgroundColor: color ? `${color}1a` : 'rgba(255,255,255,0.06)',
+      border: `1px solid ${color ? `${color}55` : 'rgba(255,255,255,0.08)'}`,
+      marginRight: '4px', marginBottom: '4px',
+    }}>
+      {IconComp && <IconComp size={11} />}
+      {label} <strong style={{ color: color || '#fff' }}>{value}</strong>
+    </span>
+  );
+}
+
+function Header({ title, subtitle, onBack }) {
+  return (
+    <div style={{
+      ...glassCard,
+      margin: '12px 12px 16px 12px',
+      padding: '16px',
+      position: 'sticky', top: '12px', zIndex: 10,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {onBack && (
+          <button onClick={onBack} style={{
+            background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)',
+            color: '#e8e8f0', padding: '8px', borderRadius: '12px', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', flexShrink: 0,
+          }}>
+            <ChevronLeft size={20}/>
+          </button>
+        )}
+        <div style={{ flex: 1, textAlign: 'center', paddingRight: onBack ? '40px' : '0' }}>
+          <div style={{ fontSize: '18px', fontWeight: '700', color: '#fff', lineHeight: 1.2 }}>{title}</div>
+          {subtitle && <div style={{ fontSize: '11px', color: '#a8a8b8', marginTop: '4px' }}>{subtitle}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RestTimer({ totalSeconds, onClose, soundEnabled, onToggleSound }) {
+  const [remaining, setRemaining] = useState(totalSeconds);
+  const [running, setRunning] = useState(true);
+  const intervalRef = useRef(null);
+
+  useEffect(() => {
+    if (running && remaining > 0) {
+      intervalRef.current = setInterval(() => {
+        setRemaining(r => {
+          if (r <= 1) {
+            clearInterval(intervalRef.current);
+            if (soundEnabled) {
+              try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.frequency.value = 880;
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                osc.start(); osc.stop(ctx.currentTime + 0.5);
+              } catch (e) {}
+            }
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            setRunning(false);
+            return 0;
+          }
+          return r - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(intervalRef.current);
+  }, [running, soundEnabled]);
+
+  const min = Math.floor(remaining / 60);
+  const sec = remaining % 60;
+  const pct = totalSeconds > 0 ? ((totalSeconds - remaining) / totalSeconds) * 100 : 0;
+  const isLowTime = remaining <= 10 && remaining > 0;
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: '90px', left: '50%', transform: 'translateX(-50%)',
+      zIndex: 100, width: '92%', maxWidth: '440px', ...glassCard,
+      background: remaining === 0
+        ? 'linear-gradient(135deg, rgba(102, 187, 106, 0.9) 0%, rgba(67, 160, 71, 0.85) 100%)'
+        : isLowTime
+          ? 'linear-gradient(135deg, rgba(239, 83, 80, 0.9) 0%, rgba(229, 57, 53, 0.85) 100%)'
+          : 'linear-gradient(135deg, rgba(66, 165, 245, 0.9) 0%, rgba(30, 136, 229, 0.85) 100%)',
+      padding: '12px 14px', animation: 'slideUp 0.3s ease-out',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <Timer size={22} color="#fff"/>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.85)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            {remaining === 0 ? 'Recupero finito!' : 'Recupero'}
+          </div>
+          <div style={{ fontSize: '24px', fontWeight: '700', color: '#fff', lineHeight: 1 }}>
+            {String(min).padStart(2, '0')}:{String(sec).padStart(2, '0')}
+          </div>
+        </div>
+        <button onClick={onToggleSound} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '8px', borderRadius: '10px', cursor: 'pointer', display: 'flex' }}>
+          {soundEnabled ? <Volume2 size={16}/> : <VolumeX size={16}/>}
+        </button>
+        <button onClick={() => setRunning(!running)} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '8px', borderRadius: '10px', cursor: 'pointer', display: 'flex' }}>
+          {running ? <Pause size={16}/> : <Play size={16}/>}
+        </button>
+        <button onClick={() => { setRemaining(totalSeconds); setRunning(true); }} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '8px', borderRadius: '10px', cursor: 'pointer', display: 'flex' }}>
+          <RotateCcw size={16}/>
+        </button>
+        <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: '#fff', padding: '8px 10px', borderRadius: '10px', cursor: 'pointer', fontSize: '11px', fontWeight: '700' }}>✕</button>
+      </div>
+      <div style={{ height: '4px', background: 'rgba(255,255,255,0.2)', borderRadius: '2px', marginTop: '8px', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: '#fff', transition: 'width 0.3s linear' }}/>
+      </div>
+    </div>
+  );
+}
+
+// ============= HOME =============
+
+function HomeScreen({ navigate }) {
+  const [stats, setStats] = useState({ peso: '—', sessioni: 0, sett: 1 });
+
+  useEffect(() => {
+    const peso = storage.get('peso');
+    const workouts = storage.get('workouts') || {};
+    let sessioni = 0;
+    let lastWeek = 1;
+    Object.entries(workouts).forEach(([w, days]) => {
+      Object.values(days).forEach(d => {
+        if (d && d.completato) {
+          sessioni++;
+          if (parseInt(w) > lastWeek) lastWeek = parseInt(w);
+        }
+      });
+    });
+    const ultimaSett = peso ? Object.values(peso).filter(p => p.media).slice(-1)[0] : null;
+    setStats({
+      peso: ultimaSett ? `${ultimaSett.media.toFixed(1)} kg` : '—',
+      sessioni, sett: lastWeek,
+    });
+  }, []);
+
+  const sections = [
+    { id: 'workout', label: 'Workout', IconComp: Dumbbell, color: '#66bb6a', desc: 'Tracking 8 sett · 5gg' },
+    { id: 'peso', label: 'Peso & Misure', IconComp: Scale, color: '#42a5f5', desc: 'Peso 4×/sett + misure 4 sett' },
+    { id: 'dashboard', label: 'Dashboard', IconComp: BarChart3, color: '#ab47bc', desc: '1RM stimato + andamento' },
+    { id: 'recovery', label: 'Recovery & Sonno', IconComp: Moon, color: '#78909c', desc: 'Sonno + energia + stress' },
+    { id: 'guide', label: 'Guida & Tecniche', IconComp: BookOpen, color: '#ffa726', desc: 'Spiegazione tecniche' },
+    { id: 'settings', label: 'Impostazioni & Backup', IconComp: Settings, color: '#888', desc: 'Esporta/importa dati' },
+  ];
+
+  return (
+    <div style={{ minHeight: '100vh', background: bgGradient, paddingBottom: '24px' }}>
+      <Header title="V8 Block" subtitle="100kg · IF 16:8 · 8 settimane · Cutting"/>
+      <div style={{ padding: '0 12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '16px' }}>
+          <div style={{ ...glassCard, padding: '14px 8px', textAlign: 'center', borderRadius: '16px' }}>
+            <div style={{ fontSize: '9px', color: '#a8a8b8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Peso</div>
+            <div style={{ fontSize: '17px', fontWeight: '700', color: '#42a5f5', marginTop: '4px' }}>{stats.peso}</div>
+          </div>
+          <div style={{ ...glassCard, padding: '14px 8px', textAlign: 'center', borderRadius: '16px' }}>
+            <div style={{ fontSize: '9px', color: '#a8a8b8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Sessioni</div>
+            <div style={{ fontSize: '17px', fontWeight: '700', color: '#66bb6a', marginTop: '4px' }}>{stats.sessioni}</div>
+          </div>
+          <div style={{ ...glassCard, padding: '14px 8px', textAlign: 'center', borderRadius: '16px' }}>
+            <div style={{ fontSize: '9px', color: '#a8a8b8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Settim.</div>
+            <div style={{ fontSize: '17px', fontWeight: '700', color: '#ab47bc', marginTop: '4px' }}>{stats.sett}/8</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {sections.map(s => {
+            const I = s.IconComp;
+            return (
+              <button key={s.id} onClick={() => navigate(s.id)} style={{
+                ...glassCard, display: 'flex', alignItems: 'center', gap: '14px',
+                padding: '16px', textAlign: 'left', cursor: 'pointer',
+                borderRadius: '18px', borderLeft: `3px solid ${s.color}`,
+              }}>
+                <div style={{ background: `${s.color}22`, border: `1px solid ${s.color}55`, padding: '12px', borderRadius: '14px', display: 'flex', alignItems: 'center' }}>
+                  <I size={22} color={s.color}/>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '15px', fontWeight: '600', color: '#fff' }}>{s.label}</div>
+                  <div style={{ fontSize: '11px', color: '#a8a8b8', marginTop: '3px' }}>{s.desc}</div>
+                </div>
+                <ChevronRight size={18} color="#666"/>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: '10px', color: '#666', textAlign: 'center', marginTop: '24px', lineHeight: 1.6 }}>
+          Dati salvati localmente · V8 Block Cutting<br/>8 Settimane
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============= WORKOUT =============
+
+function WorkoutScreen({ goBack }) {
+  const [view, setView] = useState('select');
+  const [selectedWeek, setSelectedWeek] = useState(1);
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [data, setData] = useState({});
+  const [activeTimer, setActiveTimer] = useState(null);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+
+  useEffect(() => {
+    setData(storage.get('workouts') || {});
+    const sound = storage.get('soundEnabled');
+    if (sound !== null) setSoundEnabled(sound);
+  }, []);
+
+  const getBlock = (week) => BLOCKS.find(b => b.weeks.includes(week));
+
+  const updateExercise = (week, day, exIdx, field, value, setIdx) => {
+    const newData = JSON.parse(JSON.stringify(data));
+    if (!newData[week]) newData[week] = {};
+    if (!newData[week][day]) newData[week][day] = { esercizi: {}, completato: false };
+    if (!newData[week][day].esercizi[exIdx]) newData[week][day].esercizi[exIdx] = { kg: '', reps: ['', '', '', ''], rir: '' };
+    if (field === 'kg' || field === 'rir') newData[week][day].esercizi[exIdx][field] = value;
+    else if (field === 'reps') {
+      if (!newData[week][day].esercizi[exIdx].reps) newData[week][day].esercizi[exIdx].reps = [];
+      newData[week][day].esercizi[exIdx].reps[setIdx] = value;
+    }
+    setData(newData);
+    storage.set('workouts', newData);
+  };
+
+  const toggleComplete = (week, day) => {
+    const newData = JSON.parse(JSON.stringify(data));
+    if (!newData[week]) newData[week] = {};
+    if (!newData[week][day]) newData[week][day] = { esercizi: {}, completato: false };
+    newData[week][day].completato = !newData[week][day].completato;
+    setData(newData);
+    storage.set('workouts', newData);
+  };
+
+  const isCompleted = (week, day) => data[week]?.[day]?.completato || false;
+  const startTimer = (restStr) => setActiveTimer({ seconds: parseRestSeconds(restStr), key: Date.now() });
+  const toggleSound = () => { const v = !soundEnabled; setSoundEnabled(v); storage.set('soundEnabled', v); };
+
+  if (view === 'select') {
+    const block = getBlock(selectedWeek);
+    return (
+      <div style={{ minHeight: '100vh', background: bgGradient }}>
+        <Header title="Workout" subtitle="Seleziona settimana e giorno" onBack={goBack}/>
+        <div style={{ padding: '0 12px' }}>
+          <div style={{ ...glassCard, padding: '16px', marginBottom: '14px' }}>
+            <div style={{ fontSize: '10px', textTransform: 'uppercase', color: '#a8a8b8', marginBottom: '10px', letterSpacing: '0.6px' }}>Settimana</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+              {[1,2,3,4,5,6,7,8].map(w => {
+                const b = getBlock(w);
+                const active = selectedWeek === w;
+                return (
+                  <button key={w} onClick={() => setSelectedWeek(w)} style={{
+                    padding: '12px 0',
+                    background: active ? `linear-gradient(135deg, ${b.color} 0%, ${b.color}cc 100%)` : 'rgba(255,255,255,0.05)',
+                    color: active ? 'white' : '#a8a8b8',
+                    border: active ? `1px solid ${b.color}` : '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: '12px', fontWeight: '700', fontSize: '15px', cursor: 'pointer',
+                    boxShadow: active ? `0 4px 12px ${b.color}66` : 'none',
+                  }}>S{w}</button>
+                );
+              })}
+            </div>
+            <div style={{ marginTop: '12px', padding: '10px 12px', background: `${block.color}1a`, borderLeft: `3px solid ${block.color}`, borderRadius: '8px' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: block.color }}>{block.label}</div>
+              <div style={{ fontSize: '10px', color: '#a8a8b8', marginTop: '3px' }}>Reps: {block.reps} · RIR: {block.rir}</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {DAYS.map(d => {
+              const completed = isCompleted(selectedWeek, d.id);
+              return (
+                <button key={d.id} onClick={() => { setSelectedDay(d.id); setView('day'); }} style={{
+                  ...glassCard, display: 'flex', alignItems: 'center', gap: '14px', padding: '16px',
+                  textAlign: 'left', cursor: 'pointer', borderLeft: `3px solid ${d.color}`,
+                }}>
+                  <div style={{ background: `${d.color}22`, border: `1px solid ${d.color}55`, padding: '8px 12px', borderRadius: '10px', minWidth: '52px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '9px', color: d.color, opacity: 0.7, fontWeight: '600' }}>{d.dayName}</div>
+                    <div style={{ fontSize: '13px', color: d.color, fontWeight: '700' }}>{d.label}</div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '13px', color: '#fff', fontWeight: '600' }}>{d.subtitle}</div>
+                    <div style={{ fontSize: '11px', color: '#a8a8b8', marginTop: '2px' }}>{d.dur}</div>
+                  </div>
+                  {completed && (
+                    <div style={{ background: 'rgba(102, 187, 106, 0.2)', border: '1px solid rgba(102, 187, 106, 0.5)', borderRadius: '20px', padding: '4px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Check size={12} color="#66bb6a"/>
+                      <span style={{ fontSize: '10px', color: '#66bb6a', fontWeight: '600' }}>OK</span>
+                    </div>
+                  )}
+                  <ChevronRight size={18} color="#666"/>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const day = DAYS.find(d => d.id === selectedDay);
+  const exercises = EXERCISES[selectedDay];
+  const block = getBlock(selectedWeek);
+  const completed = isCompleted(selectedWeek, selectedDay);
+
+  return (
+    <div style={{ minHeight: '100vh', background: bgGradient, paddingBottom: activeTimer ? '180px' : '90px' }}>
+      <Header title={`S${selectedWeek} · ${day.dayName} · ${day.label}`} subtitle={`${block.label} · ${day.subtitle}`} onBack={() => setView('select')}/>
+      <div style={{ padding: '0 12px' }}>
+        {exercises.map((ex, idx) => {
+          const exData = data[selectedWeek]?.[selectedDay]?.esercizi?.[idx] || { kg: '', reps: ['', '', '', ''], rir: '' };
+          const logic = applyBlockLogic(ex, selectedWeek);
+          const suggested = getSuggestedWeight(ex, selectedWeek, selectedDay, data);
+          const goalReached = (() => {
+            if (!suggested || !exData.kg) return false;
+            const targets = parseRepRange(logic.reps);
+            const repsArr = (exData.reps || []).map(r => parseInt(r)).filter(r => !isNaN(r) && r > 0);
+            return repsArr.length >= logic.sets && repsArr.every(r => r >= targets.max);
+          })();
+          
+          return (
+            <div key={idx} style={{ ...glassCard, padding: '14px', marginBottom: '12px' }}>
+              <div style={{ marginBottom: '8px' }}>
+                {ex.tags.map(t => <Tag key={t} name={t}/>)}
+                {ex.badges.map(b => <Badge key={b} name={b}/>)}
+              </div>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: '#fff', marginBottom: '10px', lineHeight: 1.3 }}>
+                {idx + 1}. {ex.name}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', marginBottom: '12px' }}>
+                <MetaPill label="Set" value={logic.sets}/>
+                <MetaPill label="Rep" value={logic.reps}/>
+                <MetaPill label="RIR" value={logic.rir}/>
+                <MetaPill label="Rest" value={logic.rest} IconComp={Timer} color="#42a5f5"/>
+              </div>
+              {suggested && !exData.kg && (
+                <div style={{
+                  background: 'rgba(255, 167, 38, 0.12)', border: '1px solid rgba(255, 167, 38, 0.4)',
+                  borderRadius: '10px', padding: '8px 12px', marginBottom: '10px',
+                  display: 'flex', alignItems: 'center', gap: '8px', animation: 'pulseGlow 2s infinite',
+                }}>
+                  <Lightbulb size={16} color="#ffa726"/>
+                  <div style={{ flex: 1, fontSize: '11px', color: '#ffd180' }}>
+                    Suggerito: <strong style={{ color: '#ffa726', fontSize: '13px' }}>{suggested} kg</strong>
+                    {selectedWeek === 4 && ex.isCompound && <span style={{ fontSize: '10px', marginLeft: '6px', color: '#ffb74d' }}>(+5% A→B)</span>}
+                  </div>
+                  <button onClick={() => updateExercise(selectedWeek, selectedDay, idx, 'kg', suggested)} style={{
+                    background: 'rgba(255, 167, 38, 0.25)', border: '1px solid rgba(255, 167, 38, 0.5)',
+                    color: '#ffa726', fontSize: '10px', fontWeight: '700',
+                    padding: '4px 10px', borderRadius: '8px', cursor: 'pointer',
+                  }}>Usa</button>
+                </div>
+              )}
+              {goalReached && (
+                <div style={{
+                  background: 'rgba(102, 187, 106, 0.15)', border: '1px solid rgba(102, 187, 106, 0.4)',
+                  borderRadius: '10px', padding: '8px 12px', marginBottom: '10px',
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                }}>
+                  <Check size={16} color="#66bb6a"/>
+                  <div style={{ fontSize: '11px', color: '#a5d6a7' }}>
+                    <strong style={{ color: '#66bb6a' }}>Obiettivo raggiunto!</strong> Sett prossima: +{isLowerBody(ex.tags) ? '5' : '2,5'} kg
+                  </div>
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                <div style={{ flex: '2' }}>
+                  <div style={{ fontSize: '9px', textTransform: 'uppercase', color: '#888', marginBottom: '4px', letterSpacing: '0.5px', textAlign: 'center' }}>Kg working</div>
+                  <input type="number" inputMode="decimal" step="0.5" placeholder={suggested || '—'} value={exData.kg}
+                    onChange={(e) => updateExercise(selectedWeek, selectedDay, idx, 'kg', e.target.value)}
+                    style={{ ...inputDark, width: '100%', padding: '10px', fontSize: '16px', fontWeight: '700', color: day.color, border: `1px solid ${day.color}55`, boxSizing: 'border-box' }}/>
+                </div>
+                <div style={{ flex: '1' }}>
+                  <div style={{ fontSize: '9px', textTransform: 'uppercase', color: '#888', marginBottom: '4px', letterSpacing: '0.5px', textAlign: 'center' }}>RIR</div>
+                  <input type="number" inputMode="numeric" placeholder="—" value={exData.rir}
+                    onChange={(e) => updateExercise(selectedWeek, selectedDay, idx, 'rir', e.target.value)}
+                    style={{ ...inputDark, width: '100%', padding: '10px', fontSize: '16px', fontWeight: '700', boxSizing: 'border-box' }}/>
+                </div>
+              </div>
+              <div style={{ marginBottom: '10px' }}>
+                <div style={{ fontSize: '9px', textTransform: 'uppercase', color: '#888', marginBottom: '6px', letterSpacing: '0.5px', textAlign: 'center' }}>Reps eseguite per serie</div>
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${logic.sets}, 1fr)`, gap: '6px' }}>
+                  {Array.from({ length: logic.sets }).map((_, setIdx) => {
+                    const repValue = exData.reps?.[setIdx] || '';
+                    const targets = parseRepRange(logic.reps);
+                    const repNum = parseInt(repValue);
+                    let borderColor = 'rgba(255,255,255,0.1)';
+                    if (!isNaN(repNum) && repNum > 0) {
+                      if (repNum >= targets.max) borderColor = 'rgba(102, 187, 106, 0.5)';
+                      else if (repNum >= targets.min) borderColor = 'rgba(66, 165, 245, 0.5)';
+                      else borderColor = 'rgba(239, 83, 80, 0.5)';
+                    }
+                    return (
+                      <div key={setIdx}>
+                        <div style={{ fontSize: '9px', color: day.color, fontWeight: '700', textAlign: 'center', marginBottom: '3px' }}>S{setIdx + 1}</div>
+                        <input type="number" inputMode="numeric" placeholder="—" value={repValue}
+                          onChange={(e) => updateExercise(selectedWeek, selectedDay, idx, 'reps', e.target.value, setIdx)}
+                          style={{ ...inputDark, width: '100%', padding: '9px 2px', fontSize: '14px', fontWeight: '700', border: `1px solid ${borderColor}`, boxSizing: 'border-box' }}/>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <button onClick={() => startTimer(logic.rest)} style={{
+                width: '100%', background: 'linear-gradient(135deg, rgba(66, 165, 245, 0.2) 0%, rgba(30, 136, 229, 0.15) 100%)',
+                border: '1px solid rgba(66, 165, 245, 0.4)', color: '#64b5f6',
+                padding: '10px', borderRadius: '10px', fontSize: '12px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontWeight: '600',
+              }}>
+                <Timer size={14}/> Avvia recupero {logic.rest}
+              </button>
+            </div>
+          );
+        })}
+        <button onClick={() => toggleComplete(selectedWeek, selectedDay)} style={{
+          width: '100%', padding: '16px', marginTop: '8px',
+          background: completed ? 'linear-gradient(135deg, #66bb6a 0%, #43a047 100%)' : 'linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%)',
+          color: 'white', border: 'none', borderRadius: '14px', fontSize: '14px', fontWeight: '700',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        }}>
+          {completed ? <><Check size={18}/> Sessione completata</> : <><Save size={18}/> Segna come completato</>}
+        </button>
+      </div>
+      {activeTimer && <RestTimer key={activeTimer.key} totalSeconds={activeTimer.seconds} onClose={() => setActiveTimer(null)} soundEnabled={soundEnabled} onToggleSound={toggleSound}/>}
+    </div>
+  );
+}
+
+// ============= PESO =============
+
+function PesoScreen({ goBack }) {
+  const [data, setData] = useState({});
+  const [pesoIniziale, setPesoIniziale] = useState(100);
+  const [misure, setMisure] = useState({});
+  const [foto, setFoto] = useState({});
+  const [tab, setTab] = useState('peso');
+
+  useEffect(() => {
+    setData(storage.get('peso') || {});
+    const init = storage.get('pesoIniziale');
+    if (init) setPesoIniziale(init);
+    setMisure(storage.get('misure') || {});
+    setFoto(storage.get('foto') || {});
+  }, []);
+
+  const updatePeso = (week, day, value) => {
+    const newData = JSON.parse(JSON.stringify(data));
+    if (!newData[week]) newData[week] = { lun: '', mer: '', ven: '', dom: '', media: 0, note: '' };
+    newData[week][day] = value;
+    const days = ['lun', 'mer', 'ven', 'dom'];
+    const valori = days.map(d => parseFloat(newData[week][d])).filter(v => !isNaN(v) && v > 0);
+    newData[week].media = valori.length > 0 ? valori.reduce((a,b)=>a+b,0) / valori.length : 0;
+    setData(newData);
+    storage.set('peso', newData);
+  };
+  const updateNote = (week, value) => {
+    const newData = JSON.parse(JSON.stringify(data));
+    if (!newData[week]) newData[week] = { lun: '', mer: '', ven: '', dom: '', media: 0, note: '' };
+    newData[week].note = value;
+    setData(newData);
+    storage.set('peso', newData);
+  };
+  const updatePesoIniziale = (value) => {
+    const v = parseFloat(value) || 100;
+    setPesoIniziale(v);
+    storage.set('pesoIniziale', v);
+  };
+  const updateMisura = (block, point, value) => {
+    const newM = { ...misure };
+    if (!newM[block]) newM[block] = {};
+    newM[block][point] = value;
+    setMisure(newM);
+    storage.set('misure', newM);
+  };
+  const toggleFoto = (key) => {
+    const newF = { ...foto, [key]: !foto[key] };
+    setFoto(newF);
+    storage.set('foto', newF);
+  };
+  const getDelta = (week) => {
+    if (!data[week]?.media) return null;
+    if (week === 1) return data[week].media - pesoIniziale;
+    if (data[week-1]?.media) return data[week].media - data[week-1].media;
+    return null;
+  };
+  const getStatusColor = (delta) => {
+    if (delta === null) return '#888';
+    if (delta <= -0.5 && delta >= -0.8) return '#66bb6a';
+    if (delta < -0.8) return '#ffa726';
+    if (delta > 0.3) return '#ef5350';
+    return '#a8a8b8';
+  };
+  const punti = ['Vita ombelicale', 'Petto', 'Coscia (max)', 'Polpaccio', 'Braccio (flesso)', 'Avambraccio'];
+
+  return (
+    <div style={{ minHeight: '100vh', background: bgGradient, paddingBottom: '24px' }}>
+      <Header title="Peso & Misure" onBack={goBack}/>
+      <div style={{ ...glassCard, margin: '0 12px 14px 12px', padding: '6px', display: 'flex' }}>
+        {[{ id: 'peso', label: 'Peso 4×/sett' }, { id: 'misure', label: 'Misure' }, { id: 'foto', label: 'Foto' }].map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)} style={{
+            flex: 1, padding: '10px 4px', border: 'none',
+            background: tab === t.id ? 'linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%)' : 'transparent',
+            color: tab === t.id ? 'white' : '#a8a8b8',
+            fontSize: '12px', fontWeight: tab === t.id ? '700' : '500', cursor: 'pointer', borderRadius: '10px',
+          }}>{t.label}</button>
+        ))}
+      </div>
+      <div style={{ padding: '0 12px' }}>
+        {tab === 'peso' && (<>
+          <div style={{ ...glassCard, padding: '16px', marginBottom: '14px' }}>
+            <div style={{ fontSize: '11px', color: '#a8a8b8', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>Peso iniziale</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <input type="number" inputMode="decimal" step="0.1" value={pesoIniziale}
+                onChange={(e) => updatePesoIniziale(e.target.value)}
+                style={{ ...inputDark, width: '110px', padding: '10px', fontSize: '20px', fontWeight: '700', color: '#42a5f5', border: '1px solid rgba(66, 165, 245, 0.4)' }}/>
+              <span style={{ fontSize: '14px', color: '#a8a8b8' }}>kg</span>
+            </div>
+          </div>
+          {[1,2,3,4,5,6,7,8].map(w => {
+            const wd = data[w] || { lun: '', mer: '', ven: '', dom: '', media: 0, note: '' };
+            const delta = getDelta(w);
+            return (
+              <div key={w} style={{ ...glassCard, padding: '14px', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '700', color: '#42a5f5' }}>SETTIMANA {w}</div>
+                  {wd.media > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {delta !== null && <span style={{ color: getStatusColor(delta), fontWeight: '700', fontSize: '12px' }}>{delta > 0 ? '+' : ''}{delta.toFixed(1)}</span>}
+                      <span style={{ fontWeight: '700', color: '#fff', fontSize: '14px' }}>{wd.media.toFixed(1)} kg</span>
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px', marginBottom: '8px' }}>
+                  {['lun','mer','ven','dom'].map(d => (
+                    <div key={d}>
+                      <div style={{ fontSize: '9px', textTransform: 'uppercase', color: '#888', textAlign: 'center', marginBottom: '3px' }}>{d}</div>
+                      <input type="number" inputMode="decimal" step="0.1" value={wd[d]} onChange={(e) => updatePeso(w, d, e.target.value)} placeholder="—"
+                        style={{ ...inputDark, width: '100%', padding: '8px 2px', fontSize: '13px', boxSizing: 'border-box', fontWeight: '600' }}/>
+                    </div>
+                  ))}
+                </div>
+                <input type="text" placeholder="Note (ciclo, sale, alcol, viaggi...)" value={wd.note} onChange={(e) => updateNote(w, e.target.value)}
+                  style={{ ...inputDark, width: '100%', padding: '8px', fontSize: '11px', textAlign: 'left', boxSizing: 'border-box' }}/>
+              </div>
+            );
+          })}
+        </>)}
+        {tab === 'misure' && (<>
+          <div style={{ fontSize: '11px', color: '#a8a8b8', marginBottom: '14px', padding: '12px', background: 'rgba(255, 167, 38, 0.1)', borderLeft: '3px solid #ffa726', borderRadius: '8px' }}>
+            Misura ogni 4 settimane (fine blocco). Centimetri.
+          </div>
+          {['INIZIO', 'FINE BL.A (S3)', 'FINE BL.B (S6)', 'FINE BL.C (S8)'].map(b => (
+            <div key={b} style={{ ...glassCard, padding: '14px', marginBottom: '10px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: '#42a5f5', marginBottom: '12px' }}>{b}</div>
+              {punti.map(p => (
+                <div key={p} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <div style={{ flex: 1, fontSize: '12px', color: '#e8e8f0' }}>{p}</div>
+                  <input type="number" inputMode="decimal" step="0.1" value={misure[b]?.[p] || ''} onChange={(e) => updateMisura(b, p, e.target.value)} placeholder="—"
+                    style={{ ...inputDark, width: '80px', padding: '8px', fontSize: '12px', fontWeight: '600' }}/>
+                  <span style={{ fontSize: '10px', color: '#888' }}>cm</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </>)}
+        {tab === 'foto' && (<>
+          <div style={{ fontSize: '11px', color: '#a8a8b8', marginBottom: '14px', padding: '12px', background: 'rgba(255, 167, 38, 0.1)', borderLeft: '3px solid #ffa726', borderRadius: '8px', lineHeight: 1.6 }}>
+            <strong style={{ color: '#ffa726' }}>Come fare le foto:</strong> 3 angoli (frontale/laterale/dorso). Stessa luce, stessa ora, stesso pasto giorno prima.
+          </div>
+          {[
+            { id: 'inizio', label: 'Inizio (S1)' },
+            { id: 'fineA', label: 'Fine Blocco A (S4)' },
+            { id: 'fineB', label: 'Fine Blocco B (S7)' },
+            { id: 'fineC', label: 'Fine Blocco C (S9)' },
+          ].map(f => (
+            <button key={f.id} onClick={() => toggleFoto(f.id)} style={{
+              ...glassCard, width: '100%', padding: '16px', marginBottom: '10px',
+              background: foto[f.id] ? 'linear-gradient(135deg, rgba(102, 187, 106, 0.25) 0%, rgba(102, 187, 106, 0.1) 100%)' : glassCard.background,
+              border: foto[f.id] ? '1px solid rgba(102, 187, 106, 0.5)' : glassCard.border,
+              color: '#fff', fontSize: '13px', fontWeight: '600',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '14px',
+            }}>
+              {foto[f.id] ? <Check size={22} color="#66bb6a"/> : <Camera size={22} color="#888"/>}
+              <span style={{ flex: 1, textAlign: 'left' }}>{f.label}</span>
+              {foto[f.id] && <span style={{ fontSize: '11px', color: '#66bb6a', fontWeight: '700' }}>FATTE ✓</span>}
+            </button>
+          ))}
+        </>)}
+      </div>
+    </div>
+  );
+}
+
+// ============= DASHBOARD =============
+
+function DashboardScreen({ goBack }) {
+  const [workouts, setWorkouts] = useState({});
+  const [pesoData, setPesoData] = useState({});
+  const [pesoIniziale, setPesoIniziale] = useState(100);
+
+  useEffect(() => {
+    setWorkouts(storage.get('workouts') || {});
+    setPesoData(storage.get('peso') || {});
+    setPesoIniziale(storage.get('pesoIniziale') || 100);
+  }, []);
+
+  const get1RM = (compound) => {
+    const result = {};
+    [1, 4, 7, 8].forEach(week => {
+      const ex = workouts[week]?.[compound.day]?.esercizi?.[compound.idx];
+      if (ex && ex.kg && ex.reps?.[0]) {
+        const kg = parseFloat(ex.kg);
+        const reps = parseFloat(ex.reps[0]);
+        if (!isNaN(kg) && !isNaN(reps) && kg > 0 && reps > 0) result[week] = kg * (1 + reps / 30);
+      }
+    });
+    return result;
+  };
+
+  const ultimaSett = Object.entries(pesoData).filter(([_, v]) => v.media > 0).sort((a,b) => parseInt(a[0]) - parseInt(b[0])).slice(-1)[0];
+  const pesoAttuale = ultimaSett ? ultimaSett[1].media : pesoIniziale;
+  const perditaTot = pesoAttuale - pesoIniziale;
+  let sessioniTot = 0;
+  Object.values(workouts).forEach(w => Object.values(w).forEach(d => { if (d?.completato) sessioniTot++; }));
+
+  return (
+    <div style={{ minHeight: '100vh', background: bgGradient, paddingBottom: '24px' }}>
+      <Header title="Dashboard" subtitle="Progressi del ciclo" onBack={goBack}/>
+      <div style={{ padding: '0 12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+          {[
+            { label: 'Iniziale', value: pesoIniziale.toFixed(1), unit: 'kg', color: '#ab47bc' },
+            { label: 'Attuale', value: pesoAttuale.toFixed(1), unit: 'kg', color: '#42a5f5' },
+            { label: 'Δ Totale', value: (perditaTot > 0 ? '+' : '') + perditaTot.toFixed(1), unit: 'kg', color: perditaTot < 0 ? '#66bb6a' : '#ef5350' },
+            { label: 'Sessioni', value: sessioniTot, unit: '/ 40', color: '#ffa726' },
+          ].map((stat, i) => (
+            <div key={i} style={{ ...glassCard, padding: '14px', textAlign: 'center' }}>
+              <div style={{ fontSize: '9px', color: '#a8a8b8', textTransform: 'uppercase', letterSpacing: '0.6px' }}>{stat.label}</div>
+              <div style={{ fontSize: '24px', fontWeight: '700', color: stat.color, marginTop: '4px' }}>{stat.value}</div>
+              <div style={{ fontSize: '10px', color: '#888' }}>{stat.unit}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ ...glassCard, padding: '16px', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+            <Dumbbell size={16} color="#ab47bc"/>
+            <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>1RM Stimato (Epley)</div>
+          </div>
+          <div style={{ fontSize: '10px', color: '#a8a8b8', marginBottom: '12px' }}>Calcolato sul primo working set. Affidabile 3-10 rep.</div>
+          {COMPOUNDS.slice(0, 5).map((c, i) => {
+            const r = get1RM(c);
+            const ini = r[1], finA = r[4], finC = r[8];
+            return (
+              <div key={i} style={{ borderBottom: i < 4 ? '1px solid rgba(255,255,255,0.06)' : 'none', padding: '10px 0' }}>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: '#fff', marginBottom: '6px' }}>{c.name}</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                  {[{ label: 'S1', val: ini }, { label: 'S4', val: finA }, { label: 'S8', val: finC }].map(b => (
+                    <div key={b.label} style={{ textAlign: 'center', background: 'rgba(171, 71, 188, 0.1)', border: '1px solid rgba(171, 71, 188, 0.2)', padding: '6px 4px', borderRadius: '8px' }}>
+                      <div style={{ fontSize: '8px', color: '#a8a8b8', textTransform: 'uppercase' }}>{b.label}</div>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#ab47bc' }}>{b.val ? b.val.toFixed(1) : '—'}</div>
+                    </div>
+                  ))}
+                  {ini && finC ? (
+                    <div style={{ textAlign: 'center', background: finC > ini ? 'rgba(102, 187, 106, 0.15)' : 'rgba(239, 83, 80, 0.15)', border: `1px solid ${finC > ini ? 'rgba(102, 187, 106, 0.3)' : 'rgba(239, 83, 80, 0.3)'}`, padding: '6px 4px', borderRadius: '8px' }}>
+                      <div style={{ fontSize: '8px', color: '#a8a8b8', textTransform: 'uppercase' }}>Δ</div>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: finC > ini ? '#66bb6a' : '#ef5350' }}>{finC > ini ? '+' : ''}{(finC - ini).toFixed(1)}</div>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '6px 4px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <div style={{ fontSize: '8px', color: '#888', textTransform: 'uppercase' }}>Δ</div>
+                      <div style={{ fontSize: '13px', color: '#666' }}>—</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ ...glassCard, padding: '16px', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <Scale size={16} color="#42a5f5"/>
+            <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>Andamento peso settimanale</div>
+          </div>
+          {[1,2,3,4,5,6,7,8].map(w => {
+            const wd = pesoData[w];
+            if (!wd?.media) return (
+              <div key={w} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', width: '30px', color: '#666' }}>S{w}</div>
+                <div style={{ flex: 1, fontSize: '11px', color: '#444' }}>—</div>
+              </div>
+            );
+            const prev = pesoData[w-1]?.media || pesoIniziale;
+            const delta = wd.media - prev;
+            let statusColor = '#a8a8b8', statusText = '○';
+            if (delta <= -0.5 && delta >= -0.8) { statusColor = '#66bb6a'; statusText = '✓'; }
+            else if (delta < -0.8) { statusColor = '#ffa726'; statusText = '⚠'; }
+            else if (delta > 0.3) { statusColor = '#ef5350'; statusText = '⚠'; }
+            const I = delta < -0.1 ? TrendingDown : delta > 0.1 ? TrendingUp : Minus;
+            const iconColor = delta < -0.1 ? '#66bb6a' : delta > 0.1 ? '#ef5350' : '#888';
+            return (
+              <div key={w} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', width: '30px', color: '#a8a8b8' }}>S{w}</div>
+                <I size={14} color={iconColor}/>
+                <div style={{ flex: 1, fontSize: '13px', fontWeight: '700', color: '#fff' }}>{wd.media.toFixed(1)} kg</div>
+                <div style={{ fontSize: '11px', color: iconColor, fontWeight: '700', width: '50px', textAlign: 'right' }}>{delta > 0 ? '+' : ''}{delta.toFixed(1)}</div>
+                <div style={{ fontSize: '14px', color: statusColor, width: '20px', textAlign: 'center' }}>{statusText}</div>
+              </div>
+            );
+          })}
+          <div style={{ fontSize: '9px', color: '#888', marginTop: '10px', lineHeight: 1.6 }}>
+            ✓ optimal (-0.5/-0.8) · ⚠ troppo veloce o no progress · ○ lento
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============= RECOVERY =============
+
+function RecoveryScreen({ goBack }) {
+  const [data, setData] = useState({});
+  useEffect(() => { setData(storage.get('recovery') || {}); }, []);
+  const update = (week, field, value) => {
+    const newData = JSON.parse(JSON.stringify(data));
+    if (!newData[week]) newData[week] = { sonno: '', energia: '', recupero: '', stress: '', note: '' };
+    newData[week][field] = value;
+    setData(newData);
+    storage.set('recovery', newData);
+  };
+  return (
+    <div style={{ minHeight: '100vh', background: bgGradient, paddingBottom: '24px' }}>
+      <Header title="Recovery & Sonno" onBack={goBack}/>
+      <div style={{ padding: '0 12px' }}>
+        <div style={{ fontSize: '11px', color: '#a8a8b8', marginBottom: '14px', padding: '12px', background: 'rgba(255, 167, 38, 0.1)', borderLeft: '3px solid #ffa726', borderRadius: '8px', lineHeight: 1.6 }}>
+          Compila settimanalmente. Energia/recupero 1-10. Sonno: media ore/notte.<br/><br/>
+          <strong style={{ color: '#ffa726' }}>Soglie:</strong> sonno &lt;7h o energia &lt;5 per 2+ sett = ridurre stimolo o +100 kcal CHO.
+        </div>
+        {[1,2,3,4,5,6,7,8].map(w => {
+          const wd = data[w] || { sonno: '', energia: '', recupero: '', stress: '', note: '' };
+          const isWarn = (parseFloat(wd.sonno) > 0 && parseFloat(wd.sonno) < 7) || (parseFloat(wd.energia) > 0 && parseFloat(wd.energia) < 5);
+          return (
+            <div key={w} style={{ ...glassCard, padding: '14px', marginBottom: '10px', borderLeft: isWarn ? '3px solid #ffa726' : '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: '#78909c' }}>SETTIMANA {w}</div>
+                {isWarn && <div style={{ fontSize: '10px', color: '#ffa726', fontWeight: '700' }}>⚠ Attenzione</div>}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                {[
+                  { f: 'sonno', label: 'Sonno (h)', step: '0.1' },
+                  { f: 'energia', label: 'Energia 1-10', step: '1' },
+                  { f: 'recupero', label: 'Recupero 1-10', step: '1' },
+                  { f: 'stress', label: 'Stress 1-10', step: '1' },
+                ].map(field => (
+                  <div key={field.f}>
+                    <div style={{ fontSize: '9px', textTransform: 'uppercase', color: '#888', marginBottom: '4px' }}>{field.label}</div>
+                    <input type="number" inputMode="decimal" step={field.step} min="0" max={field.f === 'sonno' ? '12' : '10'} value={wd[field.f]}
+                      onChange={(e) => update(w, field.f, e.target.value)} placeholder="—"
+                      style={{ ...inputDark, width: '100%', padding: '8px', fontSize: '13px', boxSizing: 'border-box', fontWeight: '600' }}/>
+                  </div>
+                ))}
+              </div>
+              <input type="text" placeholder="Note..." value={wd.note} onChange={(e) => update(w, 'note', e.target.value)}
+                style={{ ...inputDark, width: '100%', padding: '8px', fontSize: '11px', textAlign: 'left', boxSizing: 'border-box' }}/>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ============= GUIDE =============
+
+function GuideScreen({ goBack }) {
+  const techniques = [
+    { badge: 'C', name: 'Compound principale', desc: 'Esercizio multi-articolare di base che rimane fisso per tutte le 8 settimane. Cambia solo carico e rep, non l\'esercizio.', when: 'Tutto il ciclo. Mai sostituirli.' },
+    { badge: 'SMH', name: 'Stretch-Mediated Hypertrophy', desc: 'Esecuzione che enfatizza la posizione di stretch. ROM esteso, pausa 1 sec nel massimo allungamento. Maeo 2023, Kassiano 2024.', when: 'Croci cavi bassi-alti, tricipiti overhead, RDL, leg ext.' },
+    { badge: 'LLP', name: 'Long-Length Partials', desc: 'Dopo cedimento in ROM pieno, continui per 5-8 rep solo nella metà bassa. Goto 2017: +48% CSA. Sato 2021: ~3× ipertrofia.', when: 'Solo isolamento. Mai sui compound.' },
+    { badge: 'MYO', name: 'Myo-reps cluster', desc: 'Set attivazione 12-15 rep RIR 0-1 → riposo 15-30s → mini-set di 3-5 rep → ripetere 3-4 volte.', when: 'Finisher di muscoli piccoli. Es: pushdown 12 + 4 + 3 + 3.' },
+    { badge: 'ECC', name: 'Eccentric emphasis', desc: 'Discesa controllata in 2-3 secondi. Schoenfeld 2017: più danno miofibrillare e attivazione mTOR.', when: 'Default sui compound (bench, squat, RDL, dip, pull-up).' },
+    { badge: 'AMRAP', name: 'As Many Reps As Possible', desc: 'Set finale al cedimento totale con carico sub-massimale. Stima 1RM via Epley: peso × (1 + reps/30).', when: 'SOLO sett 8 del Blocco C, SOLO sui 5 compound.' },
+  ];
+  return (
+    <div style={{ minHeight: '100vh', background: bgGradient, paddingBottom: '24px' }}>
+      <Header title="Guida & Tecniche" onBack={goBack}/>
+      <div style={{ padding: '0 12px' }}>
+        <div style={{ ...glassCard, padding: '16px', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <span style={{ fontSize: '18px' }}>⭐</span>
+            <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>Regole auree cutting</div>
+          </div>
+          {[
+            'Tracking obbligatorio: usa questa app o quaderno.',
+            'Tecnica > peso: se la forma si rompe per +2,5 kg, ripeti la sett.',
+            'Riposi rispettati: 3 min compound, 90s isolamenti.',
+            'RIR onesto: programma RIR 2 = lascia 2 rep, non 0.',
+            'Sonno minimo 7,5h: <7h = ipertrofia -60% (Dattilo 2020).',
+            'Cutting lineare: 500-700 g/sett. Sopra 0,8 kg = perdita LBM.',
+            'Niente experimentation durante il ciclo.',
+          ].map((r, i) => (
+            <div key={i} style={{ fontSize: '12px', lineHeight: 1.6, marginBottom: '8px', display: 'flex', gap: '8px', color: '#e8e8f0' }}>
+              <span style={{ color: '#ffa726', fontWeight: '700', minWidth: '18px' }}>{i+1}.</span>
+              <span>{r}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ ...glassCard, padding: '16px', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <Lightbulb size={16} color="#ffa726"/>
+            <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>Funzione peso suggerito</div>
+          </div>
+          <div style={{ fontSize: '11px', color: '#c8c8d8', lineHeight: 1.6 }}>
+            Dalla settimana 2 in poi, ogni esercizio mostra un <strong style={{ color: '#ffa726' }}>peso suggerito</strong>:
+            <ul style={{ margin: '8px 0 0 16px', paddingLeft: '4px' }}>
+              <li style={{ marginBottom: '6px' }}>Top range raggiunto → +2,5 kg upper / +5 kg lower</li>
+              <li style={{ marginBottom: '6px' }}>Non raggiunto → stesso peso</li>
+              <li style={{ marginBottom: '6px' }}>Sett 4 (passaggio Blocco A→B compound): <strong>+5%</strong></li>
+            </ul>
+          </div>
+        </div>
+        <div style={{ ...glassCard, padding: '16px', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <Timer size={16} color="#42a5f5"/>
+            <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>Timer recupero</div>
+          </div>
+          <div style={{ fontSize: '11px', color: '#c8c8d8', lineHeight: 1.6 }}>
+            Ogni esercizio ha il rest specifico. Tap su <strong style={{ color: '#42a5f5' }}>"Avvia recupero"</strong>. Beep + vibrazione al termine.
+          </div>
+        </div>
+        <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff', marginBottom: '10px', padding: '0 4px' }}>📚 Tecniche usate</div>
+        {techniques.map((t, i) => (
+          <div key={i} style={{ ...glassCard, padding: '14px', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <Badge name={t.badge}/>
+              <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>{t.name}</div>
+            </div>
+            <div style={{ fontSize: '11px', color: '#c8c8d8', lineHeight: 1.6, marginBottom: '8px' }}>{t.desc}</div>
+            <div style={{ fontSize: '10px', color: '#a8a8b8', fontStyle: 'italic', background: 'rgba(255,255,255,0.04)', padding: '6px 10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <strong style={{ color: '#42a5f5' }}>Quando:</strong> {t.when}
+            </div>
+          </div>
+        ))}
+        <div style={{ ...glassCard, padding: '16px', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <span style={{ fontSize: '16px' }}>⏰</span>
+            <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>Timing V8 (WO 17:00-18:15)</div>
+          </div>
+          {[
+            { time: '16:30', text: 'Caffeina 200mg + EGCG 300mg + L-Citrullina 8g + β-Alanina 3,2g' },
+            { time: '17:00', text: 'Inizio WO. NutraBio Alpha EAA in 700ml acqua, sippato.' },
+            { time: '18:15', text: 'Fine WO. Doccia.' },
+            { time: '18:30', text: 'Shake: 40g Whey + banana + 30g miele + 5g Creatina + 2g Carnitina + HMB 1,5g' },
+          ].map(t => (
+            <div key={t.time} style={{ fontSize: '11px', marginBottom: '8px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+              <strong style={{ color: '#42a5f5', minWidth: '40px', background: 'rgba(66, 165, 245, 0.1)', padding: '2px 6px', borderRadius: '4px', textAlign: 'center', fontSize: '10px' }}>{t.time}</strong>
+              <span style={{ color: '#c8c8d8', lineHeight: 1.5, flex: 1 }}>{t.text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============= SETTINGS / BACKUP =============
+
+function SettingsScreen({ goBack }) {
+  const [msg, setMsg] = useState(null);
+  const fileInputRef = useRef(null);
+
+  const exportData = () => {
+    const data = storage.exportAll();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const date = new Date().toISOString().split('T')[0];
+    a.download = `v8tracker-backup-${date}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setMsg({ type: 'success', text: 'Backup scaricato!' });
+    setTimeout(() => setMsg(null), 3000);
+  };
+
+  const importData = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (confirm('Importare i dati? Sovrascriverà i dati attuali.')) {
+          storage.importAll(data);
+          setMsg({ type: 'success', text: 'Dati importati! Ricarica la pagina.' });
+          setTimeout(() => window.location.reload(), 1500);
+        }
+      } catch (err) {
+        setMsg({ type: 'error', text: 'File non valido.' });
+        setTimeout(() => setMsg(null), 3000);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const clearAll = () => {
+    if (confirm('CANCELLARE TUTTI I DATI? Operazione irreversibile.')) {
+      if (confirm('Sei davvero sicuro? Tutti i dati verranno persi.')) {
+        storage.clearAll();
+        setMsg({ type: 'success', text: 'Dati cancellati.' });
+        setTimeout(() => window.location.reload(), 1000);
+      }
+    }
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', background: bgGradient, paddingBottom: '24px' }}>
+      <Header title="Impostazioni & Backup" onBack={goBack}/>
+      <div style={{ padding: '0 12px' }}>
+        {msg && (
+          <div style={{
+            padding: '10px 14px', marginBottom: '14px', borderRadius: '10px',
+            background: msg.type === 'success' ? 'rgba(102, 187, 106, 0.2)' : 'rgba(239, 83, 80, 0.2)',
+            border: `1px solid ${msg.type === 'success' ? '#66bb6a' : '#ef5350'}`,
+            color: msg.type === 'success' ? '#66bb6a' : '#ef5350',
+            fontSize: '12px', fontWeight: '600',
+          }}>{msg.text}</div>
+        )}
+        <div style={{ ...glassCard, padding: '16px', marginBottom: '14px' }}>
+          <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff', marginBottom: '8px' }}>Backup dati</div>
+          <div style={{ fontSize: '11px', color: '#a8a8b8', lineHeight: 1.5, marginBottom: '14px' }}>
+            Tutti i dati sono salvati nel browser del tuo telefono. Esporta periodicamente un backup JSON per non perderli (es. se cancelli i dati del browser, cambi telefono).
+          </div>
+          <button onClick={exportData} style={{
+            width: '100%', padding: '14px', marginBottom: '10px',
+            background: 'linear-gradient(135deg, #66bb6a 0%, #43a047 100%)',
+            color: 'white', border: 'none', borderRadius: '12px',
+            fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+          }}>
+            <Download size={16}/> Esporta backup JSON
+          </button>
+          <input ref={fileInputRef} type="file" accept="application/json" onChange={importData} style={{ display: 'none' }}/>
+          <button onClick={() => fileInputRef.current?.click()} style={{
+            width: '100%', padding: '14px',
+            background: 'linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%)',
+            color: 'white', border: 'none', borderRadius: '12px',
+            fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+          }}>
+            <Upload size={16}/> Importa backup
+          </button>
+        </div>
+        <div style={{ ...glassCard, padding: '16px', marginBottom: '14px', borderLeft: '3px solid #ef5350' }}>
+          <div style={{ fontSize: '13px', fontWeight: '700', color: '#ef5350', marginBottom: '8px' }}>Zona pericolo</div>
+          <div style={{ fontSize: '11px', color: '#a8a8b8', lineHeight: 1.5, marginBottom: '14px' }}>
+            Cancella tutti i dati dell'app dal browser. Operazione irreversibile.
+          </div>
+          <button onClick={clearAll} style={{
+            width: '100%', padding: '14px',
+            background: 'rgba(239, 83, 80, 0.2)', color: '#ef5350',
+            border: '1px solid rgba(239, 83, 80, 0.5)', borderRadius: '12px',
+            fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+          }}>
+            Cancella tutti i dati
+          </button>
+        </div>
+        <div style={{ ...glassCard, padding: '16px' }}>
+          <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff', marginBottom: '8px' }}>Info app</div>
+          <div style={{ fontSize: '11px', color: '#a8a8b8', lineHeight: 1.6 }}>
+            <strong style={{ color: '#fff' }}>V8 Tracker PWA</strong><br/>
+            Programma: V8 Block Cutting · 8 Settimane<br/>
+            Storage: localStorage del browser<br/>
+            Funziona offline dopo la prima apertura
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============= MAIN =============
+
+function App() {
+  const [screen, setScreen] = useState('home');
+  return (
+    <div style={{ fontFamily: '-apple-system, "Helvetica Neue", Arial, sans-serif', maxWidth: '480px', margin: '0 auto', background: bgGradient, minHeight: '100vh' }}>
+      {screen === 'home' && <HomeScreen navigate={setScreen}/>}
+      {screen === 'workout' && <WorkoutScreen goBack={() => setScreen('home')}/>}
+      {screen === 'peso' && <PesoScreen goBack={() => setScreen('home')}/>}
+      {screen === 'dashboard' && <DashboardScreen goBack={() => setScreen('home')}/>}
+      {screen === 'recovery' && <RecoveryScreen goBack={() => setScreen('home')}/>}
+      {screen === 'guide' && <GuideScreen goBack={() => setScreen('home')}/>}
+      {screen === 'settings' && <SettingsScreen goBack={() => setScreen('home')}/>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+
+// Service worker registration (per offline)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
