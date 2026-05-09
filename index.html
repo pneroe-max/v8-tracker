@@ -33,6 +33,8 @@
   .glow-3 { bottom: -100px; left: 20%; width: 420px; height: 420px; background: radial-gradient(circle, rgba(102, 187, 106, 0.12), transparent 70%); }
   @keyframes slideUp { from { transform: translate(-50%, 100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
   @keyframes slideDown { from { transform: translate(0, -100%); opacity: 0; } to { transform: translate(0, 0); opacity: 1; } }
+  @keyframes slideUpModal { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  @keyframes fadeInModal { from { opacity: 0; } to { opacity: 1; } }
   @keyframes pulseGlow { 0%, 100% { box-shadow: 0 0 0 rgba(255, 167, 38, 0); } 50% { box-shadow: 0 0 12px rgba(255, 167, 38, 0.4); } }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
@@ -99,12 +101,15 @@ function TechModalProvider({ children }) {
   const [activeTech, setActiveTech] = useState(null);
   const showTech = useCallback((badge) => setActiveTech(badge), []);
   const hideTech = useCallback(() => setActiveTech(null), []);
+  // Quando la modal è aperta, registra l'handler sullo stack: il prossimo back chiude la modal
+  useAndroidBack(hideTech, !!activeTech);
+
   return (
     <TechModalContext.Provider value={{ showTech, hideTech }}>
       {children}
       {activeTech && TECH_INFO[activeTech] && (
         <div onClick={hideTech} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', animation: 'fadeIn 0.2s ease-out' }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '560px', background: 'linear-gradient(180deg, #1a2238 0%, #101626 100%)', borderTop: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px 20px 0 0', padding: '20px 18px 24px', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 -20px 60px rgba(0,0,0,0.6)', animation: 'slideUp 0.3s cubic-bezier(0.2, 0.8, 0.3, 1)' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: '560px', background: 'linear-gradient(180deg, #1a2238 0%, #101626 100%)', borderTop: '1px solid rgba(255,255,255,0.1)', borderRadius: '20px 20px 0 0', padding: '20px 18px 24px', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 -20px 60px rgba(0,0,0,0.6)', animation: 'slideUpModal 0.3s cubic-bezier(0.2, 0.8, 0.3, 1)' }}>
             <div style={{ width: '42px', height: '4px', background: 'rgba(255,255,255,0.25)', borderRadius: '2px', margin: '0 auto 14px' }}></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
               <Badge name={TECH_INFO[activeTech].badge}/>
@@ -122,6 +127,89 @@ function TechModalProvider({ children }) {
   );
 }
 const useTechModal = () => useContext(TechModalContext);
+
+// Hook per gestire il tasto indietro hardware Android.
+// Ogni schermata interna chiama useAndroidBack(goBack), che:
+//  1) al mount, fa history.pushState (così c'è un entry da poppare)
+//  2) ascolta popstate: quando l'utente preme back, chiama goBack()
+//  3) al unmount, rimuove il listener
+// BackStack globale: LIFO di handler. Il TOP riceve il prossimo back.
+// Schermate interne e modal pushano un handler quando si aprono e lo poppano quando si chiudono.
+// Un solo listener popstate a livello globale, niente race condition.
+const BackStackContext = createContext(null);
+
+function BackStackProvider({ children }) {
+  const stackRef = useRef([]); // array di { id, handler }
+  const initRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    // Garantisco che ci sia almeno un'entry "base" nello storico, così il primo back
+    // dall'app non chiude la PWA istantaneamente quando spingiamo entry sopra.
+    if (!initRef.current) {
+      initRef.current = true;
+      try {
+        if (!window.history.state || !window.history.state.vbBase) {
+          window.history.replaceState({ vbBase: true }, '');
+        }
+      } catch (e) {}
+    }
+    const onPop = () => {
+      const top = stackRef.current[stackRef.current.length - 1];
+      if (top) {
+        // Eseguo il top dello stack: lui sa come chiudersi (chiamerà popHandler)
+        top.handler();
+      }
+      // Se lo stack è vuoto, lasciamo che il browser gestisca (chiude la PWA o naviga).
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const pushHandler = useCallback((handler) => {
+    const id = Math.random().toString(36).slice(2);
+    stackRef.current.push({ id, handler });
+    try { window.history.pushState({ vbStackId: id }, ''); } catch (e) {}
+    return id;
+  }, []);
+
+  const popHandler = useCallback((id) => {
+    const idx = stackRef.current.findIndex(h => h.id === id);
+    if (idx === -1) return;
+    // Rimuovo dallo stack
+    stackRef.current.splice(idx, 1);
+    // Se era IL top, faccio anche history.back() per allineare lo stack del browser.
+    // Questo serve nel caso l'handler sia stato chiamato programmaticamente (es: tap su X / freccia indietro UI).
+    // Se è stato il browser a chiamare (popstate naturale), history.back() sarebbe ridondante:
+    // riconosciamo questo caso perché history.state non corrisponde più al nostro id.
+    try {
+      if (window.history.state && window.history.state.vbStackId === id) {
+        window.history.back();
+      }
+    } catch (e) {}
+  }, []);
+
+  return (
+    <BackStackContext.Provider value={{ pushHandler, popHandler }}>
+      {children}
+    </BackStackContext.Provider>
+  );
+}
+
+// Hook: registra un handler quando 'enabled' è true. Quando enabled diventa false o il componente smonta,
+// l'handler viene rimosso. Quando l'utente preme back e l'handler è in cima allo stack, viene chiamato.
+function useAndroidBack(handler, enabled = true) {
+  const ctx = useContext(BackStackContext);
+  const handlerRef = useRef(handler);
+  useEffect(() => { handlerRef.current = handler; }, [handler]);
+
+  useEffect(() => {
+    if (!enabled || !ctx) return;
+    const id = ctx.pushHandler(() => handlerRef.current && handlerRef.current());
+    return () => ctx.popHandler(id);
+  }, [enabled, ctx]);
+}
+
 
 
 // ============= DATA — V8 ESERCIZI CON DESCRIZIONI =============
@@ -881,6 +969,16 @@ function WorkoutScreen({ goBack }) {
   const [data, setData] = useState({});
   const [detailExercise, setDetailExercise] = useState(null);
 
+  // Tasto indietro Android per le sub-view interne di Workout:
+  //  - se siamo nel detail: torna alla lista del giorno
+  //  - altrimenti se siamo in 'day': torna a 'select'
+  // Quando siamo in 'select' il back globale (App) ci porta alla home.
+  const handleInternalBack = useCallback(() => {
+    if (detailExercise) { setDetailExercise(null); return; }
+    if (view === 'day') { setView('select'); return; }
+  }, [detailExercise, view]);
+  useAndroidBack(handleInternalBack, !!detailExercise || view === 'day');
+
   useEffect(() => { setData(storage.get('workouts') || {}); }, []);
 
   const getBlock = (week) => BLOCKS.find(b => b.weeks.includes(week));
@@ -1089,7 +1187,7 @@ function WorkoutScreen({ goBack }) {
                       <input
                         type="number"
                         inputMode="numeric"
-                        placeholder={`reps (${logic.reps})`}
+                        placeholder={String(targets.max)}
                         value={repValue}
                         onChange={(e) => updateExercise(selectedWeek, selectedDay, idx, 'reps', e.target.value, setIdx)}
                         style={{ ...inputDark, width: '100%', padding: '8px 10px', fontSize: '14px', fontWeight: '700', border: `1px solid ${borderColor}`, boxSizing: 'border-box', textAlign: 'center' }}
@@ -1097,6 +1195,10 @@ function WorkoutScreen({ goBack }) {
                       <button
                         onClick={() => {
                           const willBeDone = !isDone;
+                          // Se non ho inserito reps e sto confermando, uso il massimo del range
+                          if (willBeDone && (!repValue || repValue === '')) {
+                            updateExercise(selectedWeek, selectedDay, idx, 'reps', String(targets.max), setIdx);
+                          }
                           updateExercise(selectedWeek, selectedDay, idx, 'sets_done', willBeDone, setIdx);
                           if (willBeDone) {
                             startTimer(parseRestSeconds(logic.rest), `${ex.name} S${setIdx+1}`);
@@ -1612,22 +1714,27 @@ function SettingsScreen({ goBack }) {
 
 function App() {
   const [screen, setScreen] = useState('home');
+  const goHome = useCallback(() => setScreen('home'), []);
+  // Quando siamo fuori da home, intercetta il tasto indietro per tornare alla home
+  useAndroidBack(goHome, screen !== 'home');
+  // Wrapper per navigate da HomeScreen che ora pusha history (così back funziona da subito)
+  const navigate = useCallback((s) => setScreen(s), []);
   return (
     <TimerProvider>
       <div style={{ fontFamily: '-apple-system, "Helvetica Neue", Arial, sans-serif', maxWidth: '480px', margin: '0 auto', minHeight: '100vh' }}>
-        {screen === 'home' && <HomeScreen navigate={setScreen}/>}
-        {screen === 'workout' && <WorkoutScreen goBack={() => setScreen('home')}/>}
-        {screen === 'peso' && <PesoScreen goBack={() => setScreen('home')}/>}
-        {screen === 'dashboard' && <DashboardScreen goBack={() => setScreen('home')}/>}
-        {screen === 'recovery' && <RecoveryScreen goBack={() => setScreen('home')}/>}
-        {screen === 'guide' && <GuideScreen goBack={() => setScreen('home')}/>}
-        {screen === 'settings' && <SettingsScreen goBack={() => setScreen('home')}/>}
+        {screen === 'home' && <HomeScreen navigate={navigate}/>}
+        {screen === 'workout' && <WorkoutScreen goBack={goHome}/>}
+        {screen === 'peso' && <PesoScreen goBack={goHome}/>}
+        {screen === 'dashboard' && <DashboardScreen goBack={goHome}/>}
+        {screen === 'recovery' && <RecoveryScreen goBack={goHome}/>}
+        {screen === 'guide' && <GuideScreen goBack={goHome}/>}
+        {screen === 'settings' && <SettingsScreen goBack={goHome}/>}
       </div>
     </TimerProvider>
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<TechModalProvider><App/></TechModalProvider>);
+ReactDOM.createRoot(document.getElementById('root')).render(<BackStackProvider><TechModalProvider><App/></TechModalProvider></BackStackProvider>);
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
