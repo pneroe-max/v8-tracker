@@ -140,12 +140,17 @@ const BackStackContext = createContext(null);
 
 function BackStackProvider({ children }) {
   const stackRef = useRef([]); // array di { id, handler }
+  // popInProgress: true quando popHandler viene chiamato come conseguenza di popstate
+  // (back hardware del browser). Serve a NON fare history.back() di nuovo (doppio pop).
+  const popInProgressRef = useRef(false);
+  // skipNextPop: true quando abbiamo appena chiamato history.back() per cleanup
+  // (chiusura programmatica). Il prossimo popstate va ignorato perché è solo
+  // l'allineamento dello storico, non una richiesta dell'utente.
+  const skipNextPopRef = useRef(false);
   const initRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    // Garantisco che ci sia almeno un'entry "base" nello storico, così il primo back
-    // dall'app non chiude la PWA istantaneamente quando spingiamo entry sopra.
     if (!initRef.current) {
       initRef.current = true;
       try {
@@ -155,12 +160,18 @@ function BackStackProvider({ children }) {
       } catch (e) {}
     }
     const onPop = () => {
+      // Se questo popstate è solo allineamento da cleanup, ignoralo.
+      if (skipNextPopRef.current) {
+        skipNextPopRef.current = false;
+        return;
+      }
       const top = stackRef.current[stackRef.current.length - 1];
       if (top) {
-        // Eseguo il top dello stack: lui sa come chiudersi (chiamerà popHandler)
-        top.handler();
+        popInProgressRef.current = true;
+        try { top.handler(); } finally {
+          Promise.resolve().then(() => { popInProgressRef.current = false; });
+        }
       }
-      // Se lo stack è vuoto, lasciamo che il browser gestisca (chiude la PWA o naviga).
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
@@ -176,17 +187,15 @@ function BackStackProvider({ children }) {
   const popHandler = useCallback((id) => {
     const idx = stackRef.current.findIndex(h => h.id === id);
     if (idx === -1) return;
-    // Rimuovo dallo stack
+    const wasTop = idx === stackRef.current.length - 1;
     stackRef.current.splice(idx, 1);
-    // Se era IL top, faccio anche history.back() per allineare lo stack del browser.
-    // Questo serve nel caso l'handler sia stato chiamato programmaticamente (es: tap su X / freccia indietro UI).
-    // Se è stato il browser a chiamare (popstate naturale), history.back() sarebbe ridondante:
-    // riconosciamo questo caso perché history.state non corrisponde più al nostro id.
-    try {
-      if (window.history.state && window.history.state.vbStackId === id) {
-        window.history.back();
-      }
-    } catch (e) {}
+    if (popInProgressRef.current) return;
+    if (wasTop) {
+      // Cleanup programmatico: faccio back per allineare lo storico,
+      // ma marco "skip" in modo che onPop ignori questo specifico evento.
+      skipNextPopRef.current = true;
+      try { window.history.back(); } catch (e) { skipNextPopRef.current = false; }
+    }
   }, []);
 
   return (
