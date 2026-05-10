@@ -141,12 +141,8 @@ const BackStackContext = createContext(null);
 function BackStackProvider({ children }) {
   const stackRef = useRef([]); // array di { id, handler }
   // popInProgress: true quando popHandler viene chiamato come conseguenza di popstate
-  // (back hardware del browser). Serve a NON fare history.back() di nuovo (doppio pop).
+  // (back hardware). Evita history.back() ricorsivi.
   const popInProgressRef = useRef(false);
-  // skipNextPop: true quando abbiamo appena chiamato history.back() per cleanup
-  // (chiusura programmatica). Il prossimo popstate va ignorato perché è solo
-  // l'allineamento dello storico, non una richiesta dell'utente.
-  const skipNextPopRef = useRef(false);
   const initRef = useRef(false);
 
   useEffect(() => {
@@ -160,11 +156,8 @@ function BackStackProvider({ children }) {
       } catch (e) {}
     }
     const onPop = () => {
-      // Se questo popstate è solo allineamento da cleanup, ignoralo.
-      if (skipNextPopRef.current) {
-        skipNextPopRef.current = false;
-        return;
-      }
+      // Prendo il top dello stack interno. Se vuoto o handler obsoleto, lascio
+      // che il browser gestisca normalmente (continua a tornare indietro).
       const top = stackRef.current[stackRef.current.length - 1];
       if (top) {
         popInProgressRef.current = true;
@@ -187,15 +180,13 @@ function BackStackProvider({ children }) {
   const popHandler = useCallback((id) => {
     const idx = stackRef.current.findIndex(h => h.id === id);
     if (idx === -1) return;
-    const wasTop = idx === stackRef.current.length - 1;
     stackRef.current.splice(idx, 1);
-    if (popInProgressRef.current) return;
-    if (wasTop) {
-      // Cleanup programmatico: faccio back per allineare lo storico,
-      // ma marco "skip" in modo che onPop ignori questo specifico evento.
-      skipNextPopRef.current = true;
-      try { window.history.back(); } catch (e) { skipNextPopRef.current = false; }
-    }
+    // Niente history.back() di cleanup: alcuni browser mobile bloccano lo scroll
+    // dopo certe sequenze di pushState/back rapide. Lasciamo lo storico browser
+    // leggermente piu' lungo dello stack interno: e' innocuo perche' onPop
+    // controlla sempre lo stack interno per trovare l'handler da eseguire.
+    // Conseguenza: dopo chiusure programmatiche multiple, l'utente potrebbe dover
+    // premere back 1 volta in piu' per uscire dall'app. E' un compromesso accettabile.
   }, []);
 
   return (
